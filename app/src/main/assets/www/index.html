@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reifen Einlagerung</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <div>
+      <h1>Reifen Einlagerung</h1>
+      <p class="lede">PDF oder CSV einlesen, Spalten den Feldern zuordnen und auf dem Tablet speichern. Aus den Datensätzen entstehen druckfertige QR-Etiketten.</p>
+    </div>
+    <div class="chips" aria-label="Status">
+      <span class="dot" id="stDb">Speicher</span>
+      <span class="dot" id="stPdf">PDF-Leser</span>
+      <span class="dot" id="stQr">QR-Erzeugung</span>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="t-db" aria-selected="true" aria-controls="p-db" data-tab="db">Datenbank <small id="cnt">0</small></button>
+    <button class="tab" role="tab" id="t-in" aria-selected="false" aria-controls="p-in" data-tab="in">Einlesen</button>
+    <button class="tab" role="tab" id="t-fd" aria-selected="false" aria-controls="p-fd" data-tab="fd">Felder</button>
+    <button class="tab" role="tab" id="t-qr" aria-selected="false" aria-controls="p-qr" data-tab="qr">QR-Etiketten</button>
+    <button class="tab" role="tab" id="t-sc" aria-selected="false" aria-controls="p-sc" data-tab="sc">Scannen</button>
+  </div>
+
+  <!-- Datenbank -->
+  <section class="panel" id="p-db" role="tabpanel" aria-labelledby="t-db">
+    <div id="dbNote"></div>
+    <div class="row between" style="margin-bottom:12px">
+      <div class="row">
+        <input type="search" id="q" placeholder="Suchen" aria-label="Datensätze durchsuchen" style="min-width:200px">
+        <button class="btn" id="addRec" type="button">Datensatz hinzufügen</button>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="toQr" type="button">QR-Etiketten erstellen</button>
+        <button class="btn" id="expCsv" type="button">Als CSV speichern</button>
+        <button class="btn" id="bkSave" type="button">Sicherung speichern</button>
+        <button class="btn" id="bkLoad" type="button">Sicherung laden</button>
+        <input id="bkFile" type="file" accept=".json,application/json" hidden>
+      </div>
+    </div>
+    <div class="tbl-wrap" id="dbWrap"><table id="dbTbl"></table></div>
+    <div class="row between" style="margin-top:10px">
+      <div class="pager"><button class="btn small" id="prev" type="button">Zurück</button><span id="pg"></span><button class="btn small" id="next" type="button">Weiter</button></div>
+      <p class="msg" id="dbMsg" role="status"></p>
+    </div>
+  </section>
+
+  <!-- Einlesen -->
+  <section class="panel" id="p-in" role="tabpanel" aria-labelledby="t-in" hidden>
+    <div class="stack">
+      <div>
+        <h2>1. Quelle</h2>
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="PDF oder CSV-Datei auswählen">
+          <strong>PDF oder CSV-Datei wählen</strong>
+          <span>PDF mit lesbarem Text, CSV, TSV oder Textdatei. Gescannte PDFs ohne Text lassen sich ohne KI nicht lesen.</span>
+        </div>
+        <input id="file" type="file" accept=".pdf,.csv,.tsv,.txt,application/pdf,text/csv,text/plain,text/tab-separated-values" hidden>
+        <dl class="fileinfo" id="fileInfo" hidden></dl>
+        <details style="margin-top:12px">
+          <summary class="hint" style="cursor:pointer">Oder Text einfügen</summary>
+          <textarea id="paste" spellcheck="false" aria-label="Text einfügen" style="margin-top:8px"></textarea>
+        </details>
+        <p class="msg" id="srcMsg" role="status" style="margin-top:8px"></p>
+      </div>
+
+      <div id="mapBox" hidden>
+        <h2>2. Spalten zuordnen</h2>
+        <p class="hint">Wählen Sie über jeder Spalte das passende Feld. Durchgestrichene Zeilen werden nicht übernommen.</p>
+        <div class="mapctl">
+          <label class="num">Zeilen oben überspringen <input type="number" id="skipTop" min="0" max="500" value="0"></label>
+          <label class="num">Mindestens <input type="number" id="minCells" min="1" max="30" value="2"> Zellen pro Zeile</label>
+          <label class="num" id="gapBox">Zellen trennen ab <input type="number" id="gap" min="1" max="60" value="8"> pt Abstand</label>
+          <label class="num" id="splitBox">Trennung
+            <select id="splitMode" aria-label="Trennung">
+              <option value="auto">Automatisch</option>
+              <option value="semi">Semikolon</option>
+              <option value="comma">Komma</option>
+              <option value="tab">Tabulator</option>
+              <option value="pipe">Senkrechter Strich</option>
+              <option value="space">Mehrere Leerzeichen</option>
+            </select>
+          </label>
+          <button class="btn small" id="autoMap" type="button">Automatisch zuordnen</button>
+        </div>
+        <div class="tbl-wrap"><table class="maptbl" id="mapTbl"></table></div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="applyMap" type="button">Zeilen übernehmen</button>
+          <span class="msg" id="mapMsg" role="status"></span>
+        </div>
+      </div>
+
+      <div id="review" hidden>
+        <h2>3. Prüfen und speichern</h2>
+        <div class="row between" style="margin-bottom:10px">
+          <label class="check"><input type="checkbox" id="skipDup" checked> Bereits vorhandene überspringen (Vergleich über das erste Feld)</label>
+          <div class="row">
+            <button class="btn" id="rvClear" type="button">Verwerfen</button>
+            <button class="btn primary" id="rvSave" type="button">Speichern</button>
+          </div>
+        </div>
+        <div class="tbl-wrap"><table id="rvTbl"></table></div>
+        <p class="msg" id="rvMsg" role="status" style="margin-top:8px"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Felder -->
+  <section class="panel" id="p-fd" role="tabpanel" aria-labelledby="t-fd" hidden>
+    <h2>Feldschema</h2>
+    <p class="hint" style="margin-bottom:14px">Legen Sie fest, welche Angaben gespeichert werden. Die Beschreibung ist eine Gedächtnisstütze für Sie. Das Startschema ist ein Beispiel für eine Artikelliste.</p>
+    <div class="fields" id="fields"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="addField" type="button">Feld hinzufügen</button>
+      <button class="btn primary" id="saveFields" type="button">Felder speichern</button>
+      <span class="msg" id="fdMsg" role="status"></span>
+    </div>
+  </section>
+
+  <!-- QR-Etiketten -->
+  <section class="panel" id="p-qr" role="tabpanel" aria-labelledby="t-qr" hidden>
+    <div class="qrcols">
+      <div class="qrleft">
+        <div class="blk">
+          <div class="sub-h"><h3>Felder im Code</h3><span><button class="linkbtn" id="qColsAll" type="button">alle</button> · <button class="linkbtn" id="qColsNone" type="button">keine</button></span></div>
+          <div class="qchips" id="qChips"></div>
+        </div>
+        <div class="blk">
+          <div class="sub-h"><h3>Datensätze</h3><span class="hint" id="qSel"></span></div>
+          <div class="row" style="margin-bottom:8px"><input type="search" id="qQ" placeholder="Suchen" aria-label="Datensätze für Etiketten suchen" style="min-width:160px;flex:1"></div>
+          <div class="tbl-wrap" style="max-height:240px"><table id="qTbl"></table></div>
+        </div>
+        <div class="blk">
+          <h3>Aufbau</h3>
+          <div class="field">
+            <span class="lbl">Codes</span>
+            <div class="seg" role="radiogroup" aria-label="Codes">
+              <label><input type="radio" name="qmode" value="each" checked><span>Einer pro Datensatz</span></label>
+              <label><input type="radio" name="qmode" value="all"><span>Alle gebündelt</span></label>
+            </div>
+            <p class="hint" id="qModeHint"></p>
+          </div>
+          <div class="field">
+            <span class="lbl">Format im Code</span>
+            <div class="seg" role="radiogroup" aria-label="Format">
+              <label><input type="radio" name="qfmt" value="text" checked><span>Feld: Wert</span></label>
+              <label><input type="radio" name="qfmt" value="json"><span>JSON</span></label>
+              <label><input type="radio" name="qfmt" value="csv"><span>CSV</span></label>
+            </div>
+          </div>
+          <div class="two">
+            <div class="field">
+              <label class="lbl" for="qecc">Fehlerkorrektur</label>
+              <select id="qecc">
+                <option value="L">L · 7 % (meiste Daten)</option>
+                <option value="M" selected>M · 15 %</option>
+                <option value="Q">Q · 25 %</option>
+                <option value="H">H · 30 % (robust)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="lbl" for="qsize">Kantenlänge (cm)</label>
+              <input id="qsize" type="number" min="1" max="18" step="0.5" value="4">
+            </div>
+          </div>
+          <div class="field">
+            <label class="lbl" for="qlimit">Dichte-Limit pro Code: <span id="qLimitVal"></span></label>
+            <input id="qlimit" type="range" min="200" max="2331" step="50" value="800">
+            <p class="hint">Gilt bei gebündelten Codes. Weniger Daten pro Code lassen sich auf kleinen Etiketten besser scannen.</p>
+          </div>
+          <div class="field">
+            <label class="lbl" for="qcap">Beschriftung unter dem Code</label>
+            <select id="qcap"></select>
+          </div>
+          <label class="check"><input type="checkbox" id="qomit" checked> Leere Felder weglassen (spart Platz)</label>
+        </div>
+      </div>
+      <div class="qrright">
+        <div class="rpanel" id="qResult" aria-live="polite"></div>
+        <p class="msg" id="qMsg" role="status" style="margin-top:10px"></p>
+      </div>
+    </div>
+  </section>
+  <!-- Scannen -->
+  <section class="panel" id="p-sc" role="tabpanel" aria-labelledby="t-sc" hidden>
+    <div class="scancols">
+      <div class="scanleft">
+        <h2>Code scannen</h2>
+        <div class="row">
+          <button class="btn primary" id="camToggle" type="button">Kamera starten</button>
+          <button class="btn" id="photoBtn" type="button">Foto aufnehmen</button>
+          <input id="photoFile" type="file" accept="image/*" capture="environment" hidden>
+        </div>
+        <div class="scanbox" id="scanBox" hidden>
+          <video id="scanVideo" playsinline muted></video>
+          <div class="scanframe"></div>
+        </div>
+        <p class="msg" id="scanMsg" role="status" style="margin-top:8px"></p>
+        <div class="field" style="margin-top:14px">
+          <label class="lbl" for="scanKey">Abgleich über</label>
+          <select id="scanKey"></select>
+          <p class="hint">Der Wert dieses Feldes aus dem Code wird in der Datenbank gesucht. Danach werden alle weiteren Felder verglichen.</p>
+        </div>
+        <div class="field">
+          <label class="lbl" for="scanText">Code-Inhalt einfügen oder eingeben</label>
+          <textarea id="scanText" rows="3" placeholder="Inhalt des Codes oder eine Nummer" autocomplete="off" spellcheck="false" style="min-height:0"></textarea>
+          <div class="row"><button class="btn" id="scanGo" type="button">Abgleichen</button></div>
+        </div>
+      </div>
+      <div class="scanright">
+        <div id="scanRes" aria-live="polite"></div>
+        <div class="sub-h" style="margin-top:18px"><h3>Protokoll</h3><button class="linkbtn" id="scanClear" type="button">Liste leeren</button></div>
+        <p class="hint" id="scanSum"></p>
+        <ul class="slog" id="scanLog"></ul>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="lib/qrcode.js"></script>
+<script src="lib/pdf.min.js"></script>
+<script src="lib/jsQR.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

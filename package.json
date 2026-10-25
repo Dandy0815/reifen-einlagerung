@@ -1,0 +1,11 @@
+{
+  "name": "reifen-einlagerung",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reifen Einlagerung: PDF/CSV einlesen, lokal speichern, QR-Etiketten drucken",
+  "dependencies": {
+    "jsqr": "1.4.0",
+    "pdfjs-dist": "3.11.174",
+    "qrcode-generator": "1.4.4"
+  }
+}
